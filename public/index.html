@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Bookmark Manager</title>
+  <link rel="stylesheet" href="http://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/2.1.1/css/bootstrap.min.css">
+</head>
+<body>
+
+
+  <div class="container">
+    <h1>Bookmark Manager</h1>
+    <hr />
+    <div class="page"></div>
+  </div>
+
+
+  <script src="http://cdnjs.cloudflare.com/ajax/libs/jquery/1.8.2/jquery.min.js" type="text/javascript"></script>
+  <script src="http://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.4.2/underscore-min.js" type="text/javascript"></script>
+  <script src="http://cdnjs.cloudflare.com/ajax/libs/backbone.js/0.9.2/backbone-min.js"></script>
+
+  <script type="text/template" id="boomarks-list-template">
+    <a href="#/new" class="btn btn-primary">New</a>
+    <hr />
+    <table class="table striped">
+      <thead>
+        <tr>
+          <th>Title</th><th>URL</th><th>Folder</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% _.each(boomarks, function(bookmark) { %>
+          <tr>
+            <td><%= htmlEncode(bookmark.get('title')) %></td>
+            <td><%= htmlEncode(bookmark.get('url_link')) %></td>
+            <td><%= htmlEncode(bookmark.get('folder')) %></td>
+            <td><a class="btn" href="#/edit/<%= bookmark._id %>">Edit</a></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </script>
+
+  <script type="text/template" id="edit-bookmark-template">
+    <form class="edit-bookmark-form">
+      <legend><%= bookmark ? 'Edit' : 'New' %> bookmark</legend>
+        <label>First Name</label>
+        <input name="title" type="text" value="<%= bookmark ? bookmark.get('title') : '' %>">
+        <label>Last Name</label>
+        <input name="url" type="text" value="<%= bookmark ? bookmark.get('url_link') : '' %>">
+        <label>Age</label>
+        <input name="folder" type="text" value="<%= bookmark ? bookmark.get('folder') : '' %>">
+        <hr />
+       <button type="submit" class="btn"><%= bookmark ? 'Update' : 'Create' %></button>
+       <% if(bookmark) { %>
+        <input type="hidden" name="id" value="<%= bookmark._id %>" />
+       <button data-bookmark-id="<%= bookmark._id %>" class="btn btn-danger delete">Delete</button>
+       <% }; %>
+    </form>
+  </script>
+
+  <script>
+    function htmlEncode(value){
+      return $('<div/>').text(value).html();
+    }
+    $.fn.serializeObject = function() {
+      var o = {};
+      var a = this.serializeArray();
+      $.each(a, function() {
+          if (o[this.name] !== undefined) {
+              if (!o[this.name].push) {
+                  o[this.name] = [o[this.name]];
+              }
+              o[this.name].push(this.value || '');
+          } else {
+              o[this.name] = this.value || '';
+          }
+      });
+      return o;
+    };
+    $.ajaxPrefilter( function( options, originalOptions, jqXHR ) {
+      options.url = 'http://localhost:3000/api' + options.url;
+    });
+    var Bookmarks = Backbone.Collection.extend({
+      url: '/bookmarks'
+    });
+    var bookmark = Backbone.Model.extend({
+      urlRoot: '/bookmarks'
+    });
+    var BookmarkListView = Backbone.View.extend({
+      el: '.page',
+      render: function () {
+        var that = this;
+        var bookmarks = new Bookmarks();
+        bookmarks.fetch({
+          success: function (bookmarks) {
+            var template = _.template($('#bookmarks-list-template').html(), {bookmarks: bookmarks.models});
+            that.$el.html(template);
+          }
+        })
+      }
+    });
+    var bookmarkListView = new BookmarkListView();
+    var BookmarkEditView = Backbone.View.extend({
+      el: '.page',
+      events: {
+        'submit .edit-bookmark-form': 'saveBookmark',
+        'click .delete': 'deleteBookmark'
+      },
+      saveBookmark: function (ev) {
+        var bookmarkDetails = $(ev.currentTarget).serializeObject();
+        var bookmark = new bookmark();
+        bookmark.save(bookmarkDetails, {
+          success: function (bookmark) {
+            router.navigate('', {trigger:true});
+          }
+        });
+        return false;
+      },
+      deleteBookmark: function (ev) {
+        this.bookmark.destroy({
+          success: function () {
+            console.log('destroyed');
+            router.navigate('', {trigger:true});
+          }
+        });
+        return false;
+      },
+      render: function (options) {
+        var that = this;
+        if(options.id) {
+          that.bookmark = new bookmark({id: options.id});
+          that.bookmark.fetch({
+            success: function (user) {    
+              var template = _.template($('#edit-bookmark-template').html(), {bookmark: bookmark});
+              that.$el.html(template);
+            }
+          })
+        } else {
+          var template = _.template($('#edit-bookmark-template').html(), {bookmark: null});
+          that.$el.html(template);
+        }
+      }
+    });
+    var bookmarkEditView = new BookmarkEditView();
+    var Router = Backbone.Router.extend({
+        routes: {
+          "": "home", 
+          "edit/:id": "edit",
+          "new": "edit",
+        }
+    });
+    var router = new Router;
+    router.on('route:home', function() {
+      // render user list
+      bookmarkListView.render();
+    })
+    router.on('route:edit', function(id) {
+      bookmarkListView.render({id: id});
+    })
+    Backbone.history.start();
+  </script>
+
+
+</body>
+</html> 
